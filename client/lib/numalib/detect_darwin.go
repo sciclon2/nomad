@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 //go:build darwin
-import "runtime"
 
 package numalib
 
 import (
+	"runtime"
 	"github.com/hashicorp/nomad/client/lib/idset"
 	"github.com/hashicorp/nomad/client/lib/numalib/hw"
 	"github.com/shoenig/go-m1cpu"
