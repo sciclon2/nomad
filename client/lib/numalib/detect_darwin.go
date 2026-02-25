@@ -7,9 +7,9 @@ package numalib
 
 import (
 	"runtime"
+	"github.com/shoenig/go-m1cpu"
 	"github.com/hashicorp/nomad/client/lib/idset"
 	"github.com/hashicorp/nomad/client/lib/numalib/hw"
-	"github.com/shoenig/go-m1cpu"
 	"golang.org/x/sys/unix"
 )
 
@@ -26,21 +26,30 @@ const (
 	maxSpeed = hw.KHz(0)
 )
 
+// MacOS implements SystemScanner for macOS systems (both arm64 and x86).
+type MacOS struct{}
+
 func (m *MacOS) ScanSystem(top *Topology) {
-    // all apple hardware is non-numa; just assume as much
     top.nodeIDs = idset.Empty[hw.NodeID]()
     top.nodeIDs.Insert(nodeID)
 
-    // 🚨 Workaround: go-m1cpu is unstable on Apple Silicon (CI / VM)
-    // Avoid scanAppleSilicon completely
     if runtime.GOARCH == "arm64" {
-        // Provide minimal safe topology
-        top.Cores = make([]Core, 1)
-        top.insert(nodeID, socketID, hw.CoreID(0), Performance, maxSpeed, 0)
+        coreCount := runtime.NumCPU()
+
+        freq, _ := unix.SysctlUint64("hw.cpufrequency")
+        if freq == 0 {
+            freq = 3200000000 // fallback 3.2GHz
+        }
+        coreSpeed := hw.KHz(freq / 1000)
+
+        top.Cores = make([]Core, coreCount)
+
+        for i := 0; i < coreCount; i++ {
+            top.insert(nodeID, socketID, hw.CoreID(i), Performance, maxSpeed, coreSpeed)
+        }
         return
     }
 
-    // fallback for x86 macs
     m.scanLegacyX86(top)
 }
 
